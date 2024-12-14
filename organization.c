@@ -35,9 +35,40 @@ int get_valid_score(const char *category, int *cancelFlag) {
     }
 }
 
+int calculate_task_score(int *scores) {
+    int total = 0;
+    for (int i = 0; i < NUM_HIGH_CATEGORIES; i++) {
+        total += 2 * scores[i];
+    }
+    for (int i = 0; i < NUM_LOW_CATEGORIES; i++) {
+        total += scores[NUM_HIGH_CATEGORIES + i];
+    }
+    return total;
+}
+
+void sort_tasks(int taskScores[], char taskNames[][MAX_TASK_LENGTH], int taskCount) {
+    for (int i = 0; i < taskCount - 1; i++) {
+        for (int j = i + 1; j < taskCount; j++) {
+            if (taskScores[i] < taskScores[j]) {
+                // Swap scores
+                int tempScore = taskScores[i];
+                taskScores[i] = taskScores[j];
+                taskScores[j] = tempScore;
+
+                // Swap names
+                char tempName[MAX_TASK_LENGTH];
+                strncpy(tempName, taskNames[i], MAX_TASK_LENGTH);
+                strncpy(taskNames[i], taskNames[j], MAX_TASK_LENGTH);
+                strncpy(taskNames[j], tempName, MAX_TASK_LENGTH);
+            }
+        }
+    }
+}
+
 int main(void) {
     char task[MAX_TASK_LENGTH];
     int taskScores[MAX_TASKS][NUM_HIGH_CATEGORIES + NUM_LOW_CATEGORIES]; // Stores scores for each task
+    int totalScores[MAX_TASKS]; // Stores total importance scores for ranking
     char taskNames[MAX_TASKS][MAX_TASK_LENGTH]; // Stores task names
     int taskCount = 0;
 
@@ -88,7 +119,7 @@ int main(void) {
                 cancelFlag = 0;
                 goto next_task; // Skip storing and continue with the next task
             }
-            taskScores[taskCount][i] = 2 * score;
+            taskScores[taskCount][i] = score;
         }
 
         // Get scores for low-priority categories
@@ -102,27 +133,33 @@ int main(void) {
             taskScores[taskCount][NUM_HIGH_CATEGORIES + i] = score;
         }
 
+        // Calculate total score
+        totalScores[taskCount] = calculate_task_score(taskScores[taskCount]);
+
         taskCount++; // Task completed successfully
 
     next_task:
         continue; // Move to the next task
     }
 
-    // Display all tasks and their scores
-    printf("\nAll tasks entered. Here are the scores:\n");
-    for (int i = 0; i < taskCount; i++) {
-        printf("\nTask: %s\n", taskNames[i]);
-        printf("Scores:\n");
+    // Sort tasks by total scores in descending order
+    sort_tasks(totalScores, taskNames, taskCount);
 
-        for (int j = 0; j < NUM_HIGH_CATEGORIES; j++) {
-            printf("  %s: %d\n", highCategories[j], taskScores[i][j]);
-        }
-
-        for (int j = 0; j < NUM_LOW_CATEGORIES; j++) {
-            printf("  %s: %d\n", lowCategories[j], taskScores[i][NUM_HIGH_CATEGORIES + j]);
-        }
+    // Write sorted tasks to file
+    FILE *file = fopen("Task_Rankings.txt", "w");
+    if (file == NULL) {
+        perror("Failed to open file");
+        return 1;
     }
 
-    printf("\nExiting program.\n");
+    fprintf(file, "Task Rankings:\n");
+    for (int i = 0; i < taskCount; i++) {
+        fprintf(file, "%d. %s (Total Score: %d)\n", i + 1, taskNames[i], totalScores[i]);
+    }
+
+    fclose(file);
+
+    printf("\nAll tasks have been ranked and stored in 'Task_Rankings.txt'.\n");
+
     return 0;
 }
