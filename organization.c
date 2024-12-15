@@ -51,9 +51,11 @@ int calculate_task_score(int *scores) {
 // Function to identify and resolve ties dynamically
 void resolve_ties(int taskScores[], char taskNames[][MAX_TASK_LENGTH], int taskCount) {
     for (int i = 0; i < taskCount - 1; i++) {
-        int tieCount = 0;
+        if (i > 0 && taskScores[i] == taskScores[i - 1]) {
+            continue; // Skip if already processed in a previous tie
+        }
 
-        // Dynamically allocate memory for tiedIndices
+        int tieCount = 0;
         int *tiedIndices = (int *)malloc(taskCount * sizeof(int));
         if (tiedIndices == NULL) {
             perror("Failed to allocate memory for tiedIndices");
@@ -68,7 +70,6 @@ void resolve_ties(int taskScores[], char taskNames[][MAX_TASK_LENGTH], int taskC
             }
         }
 
-        // If a tie exists, resolve it
         if (tieCount > 1) {
             printf("\nThe following tasks are tied (Score: %d):\n", taskScores[i]);
             for (int k = 0; k < tieCount; k++) {
@@ -84,23 +85,35 @@ void resolve_ties(int taskScores[], char taskNames[][MAX_TASK_LENGTH], int taskC
             }
 
             for (int k = 0; k < tieCount; k++) {
-                scanf("%d", &order[k]);
-                if (order[k] < 1 || order[k] > tieCount) {
-                    printf("Invalid input. Please restart the ordering process.\n");
-                    free(order);
-                    free(tiedIndices);
-                    return;
+                char input[10];
+                int valid = 0;
+
+                while (!valid) {
+                    printf("Enter the rank for task %d (1-%d): ", k + 1, tieCount);
+                    fgets(input, sizeof(input), stdin);
+                    input[strcspn(input, "\n")] = '\0'; // Remove newline character
+
+                    if (isdigit(input[0])) {
+                        order[k] = atoi(input);
+                        if (order[k] >= 1 && order[k] <= tieCount) {
+                            valid = 1;
+                        } else {
+                            printf("Out of range. Please enter a number between 1 and %d.\n", tieCount);
+                        }
+                    } else {
+                        printf("Invalid input. Please enter a numeric value.\n");
+                    }
                 }
                 order[k]--; // Convert to zero-based index
             }
             getchar(); // Consume newline
 
-            // Reorder the tied tasks based on user input
+            // Temporary arrays to hold reordered tasks and scores
             char (*tempNames)[MAX_TASK_LENGTH] = malloc(tieCount * MAX_TASK_LENGTH);
             int *tempScores = malloc(tieCount * sizeof(int));
-
             if (tempNames == NULL || tempScores == NULL) {
                 perror("Failed to allocate memory for tie resolution");
+                free(order);
                 free(tiedIndices);
                 return;
             }
@@ -110,15 +123,18 @@ void resolve_ties(int taskScores[], char taskNames[][MAX_TASK_LENGTH], int taskC
                 tempScores[k] = taskScores[tiedIndices[order[k]]];
             }
 
+            // Reinsert resolved tasks into their original positions
             for (int k = 0; k < tieCount; k++) {
                 strncpy(taskNames[tiedIndices[k]], tempNames[k], MAX_TASK_LENGTH);
                 taskScores[tiedIndices[k]] = tempScores[k];
             }
 
-            free(order); // Free memory for order
+            free(tempNames);
+            free(tempScores);
+            free(order);
         }
 
-        free(tiedIndices); // Free memory for tiedIndices
+        free(tiedIndices);
     }
 }
 
